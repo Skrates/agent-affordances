@@ -175,3 +175,18 @@ def test_ignored_target_does_not_admit_other_ignored_functions(repo: Path) -> No
     assert report["stats"]["forms"] == 2
     assert report["stats"]["matching_pairs"] == 1
     assert report["matches"][0]["right"]["file"] == "old.py"
+
+
+def test_narrowest_explicit_target_is_chosen_before_corpus_filters(repo: Path) -> None:
+    source = (
+        "def factory(value):\n    class Inner:\n        def read(self):\n"
+        "            return self.value\n    return Inner()\n"
+    )
+    path = repo / "target.py"
+    path.write_text(source)
+    (repo / "outer_copy.py").write_text(source.replace("factory", "other_factory"))
+    (repo / "copy.py").write_text("def read_copy(self):\n\n\n    return self.value\n")
+    report = invoke("match", f"{path}:4", "--min-lines", "4", str(repo))
+    assert report["matches"][0]["left"]["symbol"] == "Inner.read"
+    assert report["matches"][0]["right"]["symbol"] == "read_copy"
+    assert report["matches"][0]["score"] == 1.0

@@ -152,30 +152,30 @@ def match(
         repos, forms, report = collect(
             roots, include_tests, exclude, min_lines, min_nodes, "match", threshold
         )
-        eligible = [
-            i
-            for i, form in enumerate(forms)
-            if form.path.resolve() == path
-            and form.entry.start_line <= int(line_text) <= form.entry.end_line
+        root = next((repo for repo in repos if path.is_relative_to(repo.root)), None)
+        if root is None:
+            raise ValueError("target must belong to one of the supplied repositories")
+        extra, diagnostic = read_forms(root, path, 1, 1)
+        if diagnostic:
+            raise ValueError(diagnostic.message)
+        targets = [
+            form for form in extra if form.entry.start_line <= int(line_text) <= form.entry.end_line
         ]
-        if not eligible:
-            root = next((repo for repo in repos if path.is_relative_to(repo.root)), None)
-            if root is None:
-                raise ValueError("target must belong to one of the supplied repositories")
-            extra, diagnostic = read_forms(root, path, 1, 1)
-            if diagnostic:
-                raise ValueError(diagnostic.message)
-            targets = [
-                form
-                for form in extra
-                if form.entry.start_line <= int(line_text) <= form.entry.end_line
-            ]
-            if not targets:
-                raise ValueError("no function/form contains that line")
-            target_form = min(targets, key=lambda form: form.entry.end_line - form.entry.start_line)
-            eligible = [len(forms)]
+        if not targets:
+            raise ValueError("no function/form contains that line")
+        target_form = min(targets, key=lambda form: form.entry.end_line - form.entry.start_line)
+        query = next(
+            (
+                i
+                for i, form in enumerate(forms)
+                if form.path.resolve() == path
+                and form.entry.start_line == target_form.entry.start_line
+                and form.entry.end_line == target_form.entry.end_line
+            ),
+            len(forms),
+        )
+        if query == len(forms):
             forms.append(target_form)
-        query = min(eligible, key=lambda i: forms[i].entry.end_line - forms[i].entry.start_line)
         files = report.stats.files
         report.matches, report.stats = match_forms(forms, threshold, limit, {query})
         report.stats.files = files
