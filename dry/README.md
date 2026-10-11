@@ -25,6 +25,8 @@ and must resolve REF for base scans.
 searches for similar forms elsewhere. The target must belong to a supplied Git
 repository. An explicitly named target can be a test or ignored file; it does
 not make other tests or ignored files part of the corpus.
+Size filters apply to the comparison corpus; the explicit target remains a
+query even when it is smaller than those filters.
 
 ## Across the estate
 

@@ -157,3 +157,21 @@ def test_recursive_exclusion_and_unicode_paths(repo: Path) -> None:
     report = invoke("scan", "--changed", "--exclude", "generated/**", str(repo))
     assert report["stats"]["queries"] == 1
     assert report["matches"][0]["left"]["file"] == "álfur spaced.py"
+
+
+def test_match_keeps_small_target_when_other_functions_survive_filters(repo: Path) -> None:
+    path = repo / "old.py"
+    path.write_text(SOURCE + "\ndef small(xs):\n    return xs\n")
+    report = invoke("match", f"{path}:7", "--min-lines", "4", str(repo))
+    assert report["stats"]["queries"] == 1
+    assert report["stats"]["forms"] == 2
+
+
+def test_ignored_target_does_not_admit_other_ignored_functions(repo: Path) -> None:
+    (repo / ".gitignore").write_text("scratch.py\n")
+    path = repo / "scratch.py"
+    path.write_text(SOURCE.replace("alpha", "query") + "\n" + SOURCE.replace("alpha", "other"))
+    report = invoke("match", f"{path}:2", str(repo))
+    assert report["stats"]["forms"] == 2
+    assert report["stats"]["matching_pairs"] == 1
+    assert report["matches"][0]["right"]["file"] == "old.py"

@@ -152,14 +152,6 @@ def match(
         repos, forms, report = collect(
             roots, include_tests, exclude, min_lines, min_nodes, "match", threshold
         )
-        if not any(form.path.resolve() == path for form in forms):
-            root = next((repo for repo in repos if path.is_relative_to(repo.root)), None)
-            if root is None:
-                raise ValueError("target must belong to one of the supplied repositories")
-            extra, diagnostic = read_forms(root, path, 1, 1)
-            forms.extend(extra)
-            if diagnostic:
-                raise ValueError(diagnostic.message)
         eligible = [
             i
             for i, form in enumerate(forms)
@@ -167,7 +159,22 @@ def match(
             and form.entry.start_line <= int(line_text) <= form.entry.end_line
         ]
         if not eligible:
-            raise ValueError("no function/form contains that line")
+            root = next((repo for repo in repos if path.is_relative_to(repo.root)), None)
+            if root is None:
+                raise ValueError("target must belong to one of the supplied repositories")
+            extra, diagnostic = read_forms(root, path, 1, 1)
+            if diagnostic:
+                raise ValueError(diagnostic.message)
+            targets = [
+                form
+                for form in extra
+                if form.entry.start_line <= int(line_text) <= form.entry.end_line
+            ]
+            if not targets:
+                raise ValueError("no function/form contains that line")
+            target_form = min(targets, key=lambda form: form.entry.end_line - form.entry.start_line)
+            eligible = [len(forms)]
+            forms.append(target_form)
         query = min(eligible, key=lambda i: forms[i].entry.end_line - forms[i].entry.start_line)
         files = report.stats.files
         report.matches, report.stats = match_forms(forms, threshold, limit, {query})
