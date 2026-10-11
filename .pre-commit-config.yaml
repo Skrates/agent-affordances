@@ -42,11 +42,27 @@ repos:
         language: system
         pass_filenames: false
         files: '^spark/(pyproject\.toml|uv\.(lock|toml))$'
+      # Each affordance owns its own dependency lockfile.
+      - id: uv-lock-dry
+        name: uv lock check (dry)
+        entry: uv lock --check --project dry
+        language: system
+        pass_filenames: false
+        files: '^dry/(pyproject\.toml|uv\.(lock|toml))$'
+      - id: ty-dry
+        name: ty type check (dry)
+        entry: ty check --project dry
+        language: system
+        types: [python]
+        files: '^dry/'
+        pass_filenames: false
+        stages: [pre-push]
       - id: ty
         name: ty type check
         entry: ty check
         language: system
         types: [python]
+        exclude: '^dry/'
         pass_filenames: false
         stages: [pre-push]
 
