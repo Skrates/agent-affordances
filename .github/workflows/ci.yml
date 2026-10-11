@@ -6,6 +6,22 @@ on:
   pull_request:
 
 jobs:
+  dry:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dry
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./toolchain
+        with:
+          tools: uv ruff ty
+      - run: uv sync --locked
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: ty check
+      - run: uv run pytest -q
+
   linear-reads:
     runs-on: ubuntu-latest
     defaults:
