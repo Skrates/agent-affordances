@@ -44,7 +44,8 @@ def collect(
     )
     seen: set[Path] = set()
     for repo in repos:
-        for path in repo.source_files(include_tests, excludes or []):
+        files = repo.source_files(include_tests, excludes or [])
+        for path in sorted(files, key=lambda path: (path.is_symlink(), path.as_posix())):
             if path.resolve() in seen:
                 continue
             seen.add(path.resolve())
@@ -112,15 +113,16 @@ def scan(
         )
         queries = None
         if changed or base:
-            ranges = {
-                path: spans for repo in repos for path, spans in repo.changed_lines(base).items()
-            }
+            ranges: dict[Path, list[tuple[int, int]]] = {}
+            for repo in repos:
+                for path, spans in repo.changed_lines(base).items():
+                    ranges.setdefault(path.resolve(), []).extend(spans)
             queries = {
                 i
                 for i, form in enumerate(forms)
                 if any(
                     start <= form.entry.end_line and end >= form.entry.start_line
-                    for start, end in ranges.get(form.path, [])
+                    for start, end in ranges.get(form.path.resolve(), [])
                 )
             }
         files = report.stats.files

@@ -150,3 +150,67 @@ def test_python_type_parameter_defaults_preserve_methods_and_spans(tmp_path: Pat
         ("Envelope.read", 2, 3),
         ("helper", 4, 5),
     ]
+
+
+def test_python_encoding_cookie_keeps_valid_non_ascii_source(tmp_path: Path) -> None:
+    path = tmp_path / "latin.py"
+    path.write_bytes(
+        "# coding: latin-1\ndef café(value):\n    return str(value)\n".encode("latin-1")
+    )
+    forms, diagnostic = read_forms(Repository("repo", tmp_path), path, 1, 1)
+    assert diagnostic is None
+    assert forms[0].symbol == "café"
+    assert (forms[0].entry.start_line, forms[0].entry.end_line) == (2, 3)
+
+
+@pytest.mark.parametrize("suffix", ["ts", "tsx"])
+def test_template_substitution_keeps_callee_but_normalizes_values(
+    tmp_path: Path, suffix: str
+) -> None:
+    def prints(expression: str) -> frozenset[str]:
+        forms, diagnostic = read(
+            tmp_path, f"a.{suffix}", f"function view(id: string) {{ return {expression}; }}"
+        )
+        assert diagnostic is None
+        return forms[0].entry.fingerprints
+
+    load = prints("`user ${loadUser(id)}`")
+    assert load != prints("`user ${deleteUser(id)}`")
+    assert load == prints("`account ${loadUser(id)}`")
+    assert prints("`fixed text`") == prints("`different text`")
+
+
+@pytest.mark.parametrize("callee", ["println", "std::println"])
+def test_rust_macro_callee_is_preserved(tmp_path: Path, callee: str) -> None:
+    left, diagnostic = read(
+        tmp_path, "a.rs", f'fn view(value: i32) {{ {callee}!("{{}}", value); }}'
+    )
+    other_callee = callee.replace("println", "panic")
+    right, other = read(
+        tmp_path, "b.rs", f'fn view(value: i32) {{ {other_callee}!("{{}}", value); }}'
+    )
+    renamed, renamed_error = read(
+        tmp_path, "c.rs", f'fn view(item: i32) {{ {callee}!("{{}}", item); }}'
+    )
+    assert diagnostic is other is renamed_error is None
+    assert left[0].entry.fingerprints != right[0].entry.fingerprints
+    assert left[0].entry.fingerprints == renamed[0].entry.fingerprints
+
+
+def test_python_encoding_cookie_and_type_default_use_same_utf8_offsets(tmp_path: Path) -> None:
+    path = tmp_path / "typed.py"
+    path.write_bytes(
+        "# coding: latin-1\nclass Café[T = str]:\n    def read(self, value: T):\n"
+        "        return value\n".encode("latin-1")
+    )
+    forms, diagnostic = read_forms(Repository("repo", tmp_path), path, 1, 1)
+    assert diagnostic is None
+    assert forms[0].symbol == "Café.read"
+
+
+def test_invalid_python_encoding_cookie_reports_incomplete_coverage(tmp_path: Path) -> None:
+    path = tmp_path / "invalid.py"
+    path.write_bytes(b"# coding: not-a-real-codec\ndef read(value):\n    return value\n")
+    forms, diagnostic = read_forms(Repository("repo", tmp_path), path, 1, 1)
+    assert forms == []
+    assert diagnostic is not None

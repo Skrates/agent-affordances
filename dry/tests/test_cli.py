@@ -190,3 +190,31 @@ def test_narrowest_explicit_target_is_chosen_before_corpus_filters(repo: Path) -
     assert report["matches"][0]["left"]["symbol"] == "Inner.read"
     assert report["matches"][0]["right"]["symbol"] == "read_copy"
     assert report["matches"][0]["score"] == 1.0
+
+
+def test_decorator_only_change_selects_function_and_decorator_line(repo: Path) -> None:
+    path = repo / "decorated.py"
+    path.write_text("@cache\n" + SOURCE.replace("alpha", "beta"))
+    git(repo, "add", "decorated.py")
+    git(repo, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "decorated function")
+    path.write_text(path.read_text().replace("@cache", "@other_cache"))
+    report = invoke("scan", "--changed", str(repo))
+    assert report["stats"]["queries"] == 1
+    assert report["matches"][0]["left"]["symbol"] == "beta"
+    assert report["matches"][0]["left"]["start_line"] == 1
+    assert invoke("match", f"{path}:1", str(repo))["matches"][0]["left"]["symbol"] == "beta"
+
+
+def test_changed_canonical_file_is_selected_when_alias_sorts_first(repo: Path) -> None:
+    (repo / "a_alias.py").symlink_to("old.py")
+    (repo / "copy.py").write_text(SOURCE.replace("alpha", "copy"))
+    git(repo, "add", "a_alias.py", "copy.py")
+    git(repo, "-c", "core.hooksPath=/dev/null", "commit", "-qm", "alias and copy")
+    (repo / "old.py").write_text(SOURCE.replace("alpha", "updated"))
+    report = invoke("scan", "--changed", str(repo))
+    assert report["stats"]["queries"] == 1
+    assert report["stats"]["forms"] == 2
+    assert report["matches"][0]["left"]["file"] == "old.py"
+    alias = invoke("scan", "--changed", "--exclude", "old.py", str(repo))
+    assert alias["stats"]["queries"] == 1
+    assert alias["matches"][0]["left"]["file"] == "a_alias.py"

@@ -1,6 +1,7 @@
-"""Four wheel-bundled grammars, Dryer-compatible extraction, explicit diagnostics."""
+"""Four wheel-bundled grammars, complete source spans, explicit diagnostics."""
 
 import ast
+import tokenize
 from functools import lru_cache
 from pathlib import Path
 
@@ -43,7 +44,7 @@ def parse_source(source: bytes, grammar: str) -> Tree:
     # They are type metadata, not executable operations. Preserve all offsets.
     if grammar == "python" and tree.root_node.has_error:
         try:
-            native = ast.parse(source)
+            native = ast.parse(source.decode("utf-8"))
         except SyntaxError:
             return tree
         offsets = [0]
@@ -168,7 +169,11 @@ def read_forms(
     try:
         if not path.resolve().is_relative_to(repo.root):
             raise ValueError("symlink points outside repository; skipped")
-        source = path.read_text(encoding="utf-8")
+        if language == "python":
+            with tokenize.open(path) as handle:
+                source = handle.read()
+        else:
+            source = path.read_text(encoding="utf-8")
         tree = parse_source(source.encode(), "tsx" if path.suffix == ".tsx" else language)
         if tree.root_node.has_error:
             raise ValueError("parser could not read syntax; file excluded from comparison")
@@ -177,6 +182,8 @@ def read_forms(
             start, end = node.start_point.row + 1, end_line(node)
             if end - start + 1 < min_lines:
                 continue
+            if node.parent is not None and node.parent.type == "decorated_definition":
+                start = node.parent.start_point.row + 1
             shape = normalize(node)
             if shape is None:
                 continue
@@ -191,5 +198,5 @@ def read_forms(
                     )
                 )
         return forms, None
-    except (OSError, UnicodeError, ValueError) as exc:
+    except (OSError, UnicodeError, ValueError, SyntaxError) as exc:
         return [], Diagnostic(repo=repo.name, file=relative, message=str(exc))

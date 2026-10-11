@@ -175,6 +175,9 @@ def jobs(node: Node, mode: Mode, head: bool) -> list[Job]:
         ]
     if node.type == "parenthesized_expression" and len(node.named_children) == 1:
         return [(node.named_children[0], "norm", head)]
+    if node.type == "macro_invocation":
+        macro = node.child_by_field_name("macro")
+        return [(child, "callee" if child == macro else "norm", False) for child in node.children]
     if node.type in CALLS:
         rest, types, args = call_parts(node)
         result: list[Job] = [(child, "norm", False) for child in rest[:-1]]
@@ -214,7 +217,7 @@ def normalize(root: Node) -> Shape | None:
                 cache[key] = [K("symbol"), text(node)] if head else K("symbol")
                 continue
             if node.type in LITERALS and not (
-                node.type == "string" and any(c.type == "interpolation" for c in node.children)
+                any(c.type in {"interpolation", "template_substitution"} for c in node.children)
             ):
                 cache[key] = K("literal")
                 continue

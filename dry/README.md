@@ -20,6 +20,9 @@ also includes committed changes since the merge base of REF and HEAD. Deletions
 anchor on the surviving lines on either side. Untouched functions in a modified
 file are not queries. Each supplied repository must have HEAD for change scans,
 and must resolve REF for base scans.
+Python decorator lines belong to the function's reported span and select it on
+change; minimum line counts still measure the underlying definition. Symlink
+aliases share the canonical file's identity, with its regular path preferred.
 
 `match FILE:LINE` finds the narrowest extracted form containing that line and
 searches for similar forms elsewhere. The target must belong to a supplied Git
@@ -47,6 +50,8 @@ Compare the source and its callers before deciding to reuse or consolidate it:
 similar shape does not establish equivalent behavior or the right ownership
 boundary. In particular, literal values, field names, local names, and argument
 type names normalize away. Callee names, operators, and tree shape stay.
+Expressions inside TypeScript template substitutions and Rust macro names stay
+significant. Python source encoding declarations are honored.
 
 ## Output and scope
 
