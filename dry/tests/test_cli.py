@@ -81,6 +81,18 @@ def test_ignore_tests_declarations_and_cut_languages(repo: Path) -> None:
     for name in ["ignored.py", "test_copy.py", "a.java", "a.clj", "a.d.ts"]:
         (repo / name).write_text(SOURCE)
     assert invoke("scan", str(repo))["stats"]["forms"] == 1
+    (repo / "ports.py").write_text(
+        "class Port(Protocol):\n"
+        '    def read(self, key: str, *, at: int | None = None) -> Row:\n        """Doc."""\n'
+        "    def write(self, key: str) -> None: ...\n"
+        "    def drop(self) -> None:\n        # comment\n        pass\n"
+        "    def todo(self) -> None:\n        raise NotImplementedError('later')\n"
+        '    def kept(self) -> int:\n        """Doc."""\n        return self.size\n'
+    )
+    (repo / "noop.ts").write_text("class A {\n  m(x: number): void {}\n}\n")
+    small = invoke("scan", "--min-lines", "1", "--min-nodes", "1", str(repo))
+    assert small["stats"]["forms"] == 2
+    assert runner.invoke(app, ["match", f"{repo}/ports.py:2", str(repo)]).exit_code == 2
     report = invoke("scan", "--include-tests", str(repo))
     assert report["stats"]["matching_pairs"] == 1
     assert (
@@ -121,6 +133,13 @@ def test_limit_discloses_omissions_and_order_is_stable(repo: Path) -> None:
     assert len(report["matches"]) == 2
     assert report["stats"]["matching_pairs"] == 6
     assert report["truncated"] is True
+    assert report["stats"]["identical_groups"] == 1
+    assert [m["file"] for m in report["groups"][0]["members"]] == [
+        "b.py",
+        "c.py",
+        "d.py",
+        "old.py",
+    ]
     assert report == invoke("scan", "--limit", "2", str(repo))
 
 

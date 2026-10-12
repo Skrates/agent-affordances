@@ -1,4 +1,4 @@
-"""An exhaustive oracle proves that indexing cannot hide qualifying pairs."""
+"""An exhaustive oracle proves that indexing cannot hide qualifying pairs or groups."""
 
 import random
 from itertools import combinations
@@ -36,6 +36,7 @@ def test_index_is_exact(seed: int, threshold: float) -> None:
     for queries in [None, set(), {0}, {0, 3, 8, 11, 40}, set(range(len(forms)))]:
         for cross_repo in [False, True]:
             expected = []
+            identical: dict[int, set[int]] = {}
             possible = 0
             for i, j in combinations(range(len(forms)), 2):
                 a, b = forms[i], forms[j]
@@ -55,10 +56,21 @@ def test_index_is_exact(seed: int, threshold: float) -> None:
                         else (i, j)
                     )
                     expected.append((-score, left, right))
-            matches, stats = match_forms(forms, threshold, 7, queries, cross_repo)
+                if score == 1.0:
+                    merged = identical.get(i, {i}) | identical.get(j, {j})
+                    for member in merged:
+                        identical[member] = merged
+            matches, groups, stats = match_forms(forms, threshold, 7, queries, cross_repo)
             actual = [(-m.score, int(m.left.symbol), int(m.right.symbol)) for m in matches]
             assert actual == sorted(expected)[:7]
             assert stats.matching_pairs == len(expected)
+            classes = sorted(
+                {tuple(sorted(c)) for c in identical.values()}, key=lambda c: (-len(c), c)
+            )
+            assert [[int(m.symbol) for m in g.members] for g in groups] == [
+                list(c) for c in classes[:7]
+            ]
+            assert stats.identical_groups == len(classes)
             assert stats.possible_pairs == possible
             assert stats.comparisons <= possible
 
@@ -70,14 +82,14 @@ def test_bad_threshold_is_an_error(threshold: float) -> None:
 
 
 def test_empty_fingerprints_and_size_bound() -> None:
-    matches, stats = match_forms([form(0, set()), form(1, {"x"}), form(2, {"x", "y"})], 1.0, 5)
+    matches, _, stats = match_forms([form(0, set()), form(1, {"x"}), form(2, {"x", "y"})], 1.0, 5)
     assert matches == []
     assert stats.comparisons == 0
 
 
 def test_many_unrelated_forms_need_no_intersections() -> None:
     forms = [form(i, {f"{i}:{j}" for j in range(30)}) for i in range(1000)]
-    matches, stats = match_forms(forms, 0.82, 5)
+    matches, _, stats = match_forms(forms, 0.82, 5)
     assert matches == []
     assert stats.possible_pairs == 499500
     assert stats.comparisons == 0

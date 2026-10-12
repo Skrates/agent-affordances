@@ -96,8 +96,8 @@ def test_rust_tests_and_nested_functions_are_excluded(tmp_path: Path) -> None:
     forms, diagnostic = read(
         tmp_path,
         "a.rs",
-        "fn alpha() { fn nested() {} }\nmod helpers { fn beta() {} }\n"
-        "mod tests { fn gamma() {} }\n",
+        "fn alpha() { fn nested() { run(); } }\nmod helpers { fn beta() { run(); } }\n"
+        "mod tests { fn gamma() { run(); } }\n",
     )
     assert diagnostic is None
     assert [f.symbol for f in forms] == ["alpha", "beta"]

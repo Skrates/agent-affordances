@@ -66,9 +66,19 @@ def emit(report: Report, text: bool) -> None:
                 for loc in (match.left, match.right)
             ]
             typer.echo(f"{match.score:.3f} {match.language}\n  " + "\n  ".join(refs))
+        for group in report.groups:
+            refs = [
+                f"{loc.repo}/{loc.file}:{loc.start_line}-{loc.end_line} {loc.symbol}"
+                for loc in group.members
+            ]
+            typer.echo(
+                f"identical x{len(group.members)} {group.language} {group.nodes} nodes\n  "
+                + "\n  ".join(refs)
+            )
         stats = report.stats
         typer.echo(
-            f"{len(report.matches)}/{stats.matching_pairs} pairs; {stats.forms} forms; "
+            f"{len(report.matches)}/{stats.matching_pairs} pairs; "
+            f"{len(report.groups)}/{stats.identical_groups} identical groups; {stats.forms} forms; "
             f"{stats.comparisons}/{stats.possible_pairs} comparisons; "
             f"complete={str(report.complete).lower()}"
         )
@@ -126,7 +136,9 @@ def scan(
                 )
             }
         files = report.stats.files
-        report.matches, report.stats = match_forms(forms, threshold, limit, queries, cross_repo)
+        report.matches, report.groups, report.stats = match_forms(
+            forms, threshold, limit, queries, cross_repo
+        )
         report.stats.files = files
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -164,7 +176,7 @@ def match(
             form for form in extra if form.entry.start_line <= int(line_text) <= form.entry.end_line
         ]
         if not targets:
-            raise ValueError("no function/form contains that line")
+            raise ValueError("no function with an executable body contains that line")
         target_form = min(targets, key=lambda form: form.entry.end_line - form.entry.start_line)
         query = next(
             (
@@ -179,7 +191,7 @@ def match(
         if query == len(forms):
             forms.append(target_form)
         files = report.stats.files
-        report.matches, report.stats = match_forms(forms, threshold, limit, {query})
+        report.matches, report.groups, report.stats = match_forms(forms, threshold, limit, {query})
         report.stats.files = files
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc

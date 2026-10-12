@@ -19,6 +19,13 @@ Sokrates, 1,045 within Krepis, 28 within Hive, and 1,108 across repositories.
 The exact filters avoided **99.9467%** of eligible intersections.
 Candidate count is not a count of defects or justified refactors.
 
+These figures predate two output changes. Declaration-only functions are no
+longer forms, and identical pairs are also reported as `groups`. Rescanning the
+same Sokrates commit (`5c4be1064faf`) after both changes gave 5,601 forms and 926
+pairs, down from 5,811 forms and 1,318 pairs. All 392 removed pairs were
+declaration-only on both sides. The 743 pairs scoring 1.0 form 191 identical
+groups. The Krepis, Hive, and combined rows were not re-measured.
+
 On a deterministic 1,500-form sample of that same corpus, exhaustive matching
 took **3.16 s** (875,350 intersections). Indexed matching took **0.046 s**
 (498 intersections), a **69.5x matcher speedup**. Both returned the same 76
