@@ -53,3 +53,19 @@ jobs:
       - run: ruff check .
       - run: ty check
       - run: uv run pytest -q
+
+  attention:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: attention
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./toolchain
+        with:
+          tools: uv ruff ty
+      - run: uv sync --locked
+      - run: ruff format --check .
+      - run: ruff check .
+      - run: ty check
+      - run: uv run pytest -q
