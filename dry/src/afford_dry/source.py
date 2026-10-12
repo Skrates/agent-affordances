@@ -144,21 +144,25 @@ def functions(root: Node, language: str) -> list[Node]:
     return found
 
 
+def plain_string(node: Node) -> bool:
+    return node.type == "string" and not any(c.type == "interpolation" for c in node.children)
+
+
 def inert(statement: Node) -> bool:
     if statement.type in SKIP or statement.type == "pass_statement":
         return True
     if statement.type == "expression_statement":
         return all(
-            child.type == "ellipsis"
-            or (
-                child.type == "string"
-                and not any(c.type == "interpolation" for c in child.children)
-            )
-            for child in statement.named_children
+            child.type == "ellipsis" or plain_string(child) for child in statement.named_children
         )
     if statement.type == "raise_statement" and statement.named_children:
         raised = statement.named_children[0]
         if raised.type == "call":
+            arguments = raised.child_by_field_name("arguments")
+            if arguments is not None and not all(
+                plain_string(argument) for argument in arguments.named_children
+            ):
+                return False
             raised = raised.child_by_field_name("function") or raised
         return text(raised) == "NotImplementedError"
     return False
@@ -195,7 +199,7 @@ def symbol(node: Node) -> str:
 
 
 def read_forms(
-    repo: Repository, path: Path, min_lines: int, min_nodes: int
+    repo: Repository, path: Path, min_lines: int, min_nodes: int, declarations: bool = False
 ) -> tuple[list[Form], Diagnostic | None]:
     relative = path.relative_to(repo.root).as_posix()
     language = language_of(path)
@@ -215,7 +219,10 @@ def read_forms(
         forms = []
         for node in functions(tree.root_node, language):
             start, end = node.start_point.row + 1, end_line(node)
-            if end - start + 1 < min_lines or declaration_only(node):
+            if end - start + 1 < min_lines:
+                continue
+            declaration = declaration_only(node)
+            if declaration and not declarations:
                 continue
             if node.parent is not None and node.parent.type == "decorated_definition":
                 start = node.parent.start_point.row + 1
@@ -229,7 +236,7 @@ def read_forms(
                         repo.name,
                         path,
                         symbol(node),
-                        Entry(language, relative, start, end, count, prints),
+                        Entry(language, relative, start, end, count, prints, declaration),
                     )
                 )
         return forms, None

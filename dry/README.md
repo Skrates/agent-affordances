@@ -64,7 +64,9 @@ significant. Python source encoding declarations are honored.
   not chain pairs into clusters. `groups` lists forms with identical normalized
   structure, where every pair scores 1.0. They are ordered by member count, then
   node count. `--limit` bounds them too; `stats.identical_groups` gives the total.
-  The pairs inside a group still count in `matching_pairs` and appear in `matches`.
+  A group's pairs are counted and listed like any other pair, under the same
+  focus, `--cross-repo`, and `--limit` rules. A focused or cross-repo search only
+  merges members through pairs it reports, so not every member pair need appear.
 - `stats.comparisons` counts exact fingerprint intersections;
   `stats.possible_pairs` counts the eligible exhaustive search space.
 - Exit 0 means a complete scan, including one that found candidates. Exit 1

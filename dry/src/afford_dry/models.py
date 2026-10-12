@@ -14,6 +14,7 @@ class Entry:
     end_line: int
     nodes: int
     fingerprints: frozenset[str]
+    declaration: bool = False
 
 
 class Location(BaseModel):

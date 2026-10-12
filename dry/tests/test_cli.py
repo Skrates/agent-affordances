@@ -81,23 +81,29 @@ def test_ignore_tests_declarations_and_cut_languages(repo: Path) -> None:
     for name in ["ignored.py", "test_copy.py", "a.java", "a.clj", "a.d.ts"]:
         (repo / name).write_text(SOURCE)
     assert invoke("scan", str(repo))["stats"]["forms"] == 1
+    report = invoke("scan", "--include-tests", str(repo))
+    assert report["stats"]["matching_pairs"] == 1
+    assert (
+        invoke("scan", "--include-tests", "--exclude", "test_*", str(repo))["stats"]["forms"] == 1
+    )
     (repo / "ports.py").write_text(
         "class Port(Protocol):\n"
         '    def read(self, key: str, *, at: int | None = None) -> Row:\n        """Doc."""\n'
         "    def write(self, key: str) -> None: ...\n"
         "    def drop(self) -> None:\n        # comment\n        pass\n"
         "    def todo(self) -> None:\n        raise NotImplementedError('later')\n"
+        "    def why(self) -> None:\n        raise NotImplementedError(load_reason())\n"
         '    def kept(self) -> int:\n        """Doc."""\n        return self.size\n'
+        "def factory():\n    class Inner:\n        def read(self) -> int: ...\n"
+        "    return Inner()\n"
     )
     (repo / "noop.ts").write_text("class A {\n  m(x: number): void {}\n}\n")
     small = invoke("scan", "--min-lines", "1", "--min-nodes", "1", str(repo))
-    assert small["stats"]["forms"] == 2
-    assert runner.invoke(app, ["match", f"{repo}/ports.py:2", str(repo)]).exit_code == 2
-    report = invoke("scan", "--include-tests", str(repo))
-    assert report["stats"]["matching_pairs"] == 1
-    assert (
-        invoke("scan", "--include-tests", "--exclude", "test_*", str(repo))["stats"]["forms"] == 1
-    )
+    assert small["stats"]["forms"] == 4
+    for line in [2, 17]:
+        result = runner.invoke(app, ["match", f"{repo}/ports.py:{line}", str(repo)])
+        assert result.exit_code == 2
+        assert "declaration" in result.output
 
 
 def test_cross_repo_lookup_and_labels(repo: Path, tmp_path: Path) -> None:

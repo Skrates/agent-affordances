@@ -169,15 +169,17 @@ def match(
         root = next((repo for repo in repos if path.is_relative_to(repo.root)), None)
         if root is None:
             raise ValueError("target must belong to one of the supplied repositories")
-        extra, diagnostic = read_forms(root, path, 1, 1)
+        extra, diagnostic = read_forms(root, path, 1, 1, declarations=True)
         if diagnostic:
             raise ValueError(diagnostic.message)
         targets = [
             form for form in extra if form.entry.start_line <= int(line_text) <= form.entry.end_line
         ]
         if not targets:
-            raise ValueError("no function with an executable body contains that line")
+            raise ValueError("no function/form contains that line")
         target_form = min(targets, key=lambda form: form.entry.end_line - form.entry.start_line)
+        if target_form.entry.declaration:
+            raise ValueError("the function at that line is a declaration with no executable body")
         query = next(
             (
                 i
