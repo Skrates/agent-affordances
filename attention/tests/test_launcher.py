@@ -126,3 +126,14 @@ def test_recursion_is_refused(tmp_path: Path, via: str) -> None:
         )
     assert result.returncode == 127
     assert "hive-attention" in result.stderr
+
+
+def test_unexecutable_hive_is_diagnosed_without_a_traceback(tmp_path: Path) -> None:
+    hive = tmp_path / "hive"
+    hive.write_text("#!/nonexistent/interpreter\n")
+    hive.chmod(0o755)
+    result = launch(["queue"], {"HIVE_BIN": str(hive)})
+    assert result.returncode == 126
+    assert result.stderr.startswith(f"hive-attention: cannot execute {hive}: ")
+    assert "Traceback" not in result.stderr
+    assert result.stdout == ""

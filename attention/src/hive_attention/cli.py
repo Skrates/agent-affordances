@@ -1,13 +1,14 @@
 """Forward `hive-attention <args…>` to `hive attention <args…>` without a shell.
 
-The launcher replaces its own process with Hive (``os.execv``), so standard input, output
+The launcher replaces its own process with Hive (``os.execve``), so standard input, output
 and error, signals and the exit status are Hive's own — there is no child to relay and no
 wrapper to lose a signal in. It owns no database, HTTP client, command schema, ordering or
 retry semantics.
 
 Resolution: ``HIVE_BIN`` when set (an explicit path or a name on PATH), otherwise the
 installed ``hive`` on PATH. A missing executable, or one that resolves back to this
-launcher, is refused with a diagnostic instead of looping.
+launcher, is refused with a diagnostic instead of looping (127); one that is found but
+cannot be executed is diagnosed too (126), never a traceback.
 """
 
 from __future__ import annotations
@@ -21,6 +22,9 @@ from pathlib import Path
 RECURSION_GUARD = "HIVE_ATTENTION_LAUNCHER_ACTIVE"
 #: The conventional "command not found" status, so callers can tell it from Hive's own codes.
 EXIT_NOT_FOUND = 127
+#: The shell's "found but cannot execute" status: a broken interpreter line, a bad format, a
+#: no-exec mount, or a file replaced between lookup and exec.
+EXIT_NOT_EXECUTABLE = 126
 
 
 class LauncherError(Exception):
@@ -72,7 +76,12 @@ def main(argv: list[str] | None = None) -> int:
     # Flush anything Python buffered before the process image is replaced.
     sys.stdout.flush()
     sys.stderr.flush()
-    os.execve(hive, [hive, "attention", *args], env)
+    try:
+        os.execve(hive, [hive, "attention", *args], env)
+    except OSError as error:
+        # Lookup proves the file exists, not that the kernel will run it.
+        print(f"hive-attention: cannot execute {hive}: {error.strerror or error}", file=sys.stderr)
+        return EXIT_NOT_EXECUTABLE
     return 0  # unreachable: execve either replaces this process or raises
 
 

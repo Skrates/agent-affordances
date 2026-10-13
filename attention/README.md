@@ -6,7 +6,8 @@ The agent-facing name of [Hive Attention](https://github.com/Skrates/hive/blob/m
 The launcher replaces its process with the installed `hive` (no shell, no child), so
 stdout/stderr, signals and exit codes are Hive's own. It owns no database, HTTP client,
 command schema, ordering or retry semantics — every rule lives in Hive. A missing `hive`, or a
-`HIVE_BIN` that resolves back to this launcher, exits 127 with a diagnostic.
+`HIVE_BIN` that resolves back to this launcher, exits 127 with a diagnostic; a `hive` that is
+found but cannot be executed (broken interpreter line, bad format, no-exec mount) exits 126.
 
 Tested against Hive attention schema **1** (`hive attention capabilities` reports the live
 broker's). An agent-affordances version alone says nothing about which Hive a seat has; check
