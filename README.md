@@ -7,6 +7,7 @@ directory as an independent uv project.
 | --- | --- |
 | [`linear-reads`](linear-reads/) | Token-lean read-only CLI for Linear (issue lookups, board sweeps, label queries) |
 | [`spark`](spark/) | `afford spark` semantic coreutils over Codex-Spark; optional `afford-sparkd` warm daemon |
+| [`attention`](attention/) | `hive-attention`: forwards verbatim to `hive attention` — seats summon the human through Hive's attention queue |
 | [`dry`](dry/) | `afford-dry`: find reusable code and structural duplicates across Python, TypeScript, Go, and Rust repositories |
 
 ## House standards

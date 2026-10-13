@@ -42,6 +42,12 @@ repos:
         language: system
         pass_filenames: false
         files: '^spark/(pyproject\.toml|uv\.(lock|toml))$'
+      - id: uv-lock-attention
+        name: uv lock check (attention)
+        entry: uv lock --check --project attention
+        language: system
+        pass_filenames: false
+        files: '^attention/(pyproject\.toml|uv\.(lock|toml))$'
       # Each affordance owns its own dependency lockfile.
       - id: uv-lock-dry
         name: uv lock check (dry)
