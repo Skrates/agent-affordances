@@ -4,13 +4,17 @@ If J(A,B) >= t, the sorted prefixes of lengths |S|-ceil(t*|S|)+1
 must share a token under one common token order. Otherwise their shared suffix
 cannot supply the overlap required by Jaccard. Prefix hits only nominate pairs;
 the original fingerprint sets decide the score.
+
+Similarity below 1.0 is not transitive, so pairs are never chained into clusters.
+Identity is transitive: pairs scoring exactly 1.0 merge into groups whose members
+all share one fingerprint set.
 """
 
 from collections import Counter, defaultdict
 from heapq import nsmallest
 from math import ceil, inf, isfinite, nextafter
 
-from .models import Form, Match, Stats
+from .models import Form, Group, Match, Stats
 
 
 def eligible_pairs(indices: list[int], forms: list[Form], queries: set[int] | None) -> int:
@@ -25,18 +29,26 @@ def match_forms(
     limit: int,
     queries: set[int] | None = None,
     cross_repo: bool = False,
-) -> tuple[list[Match], Stats]:
+) -> tuple[list[Match], list[Group], Stats]:
     if not isfinite(threshold) or not 0 < threshold <= 1:
         raise ValueError("threshold must be finite and greater than 0, at most 1")
     if limit < 1:
         raise ValueError("limit must be positive")
     stats = Stats(forms=len(forms), queries=len(forms) if queries is None else len(queries))
     if queries == set():
-        return [], stats
+        return [], [], stats
     groups: dict[str, list[int]] = defaultdict(list)
     for index, form in enumerate(forms):
         groups[form.entry.language].append(index)
     best: list[tuple[float, int, int, int]] = []
+    identical: dict[int, int] = {}
+
+    def root(i: int) -> int:
+        while identical.setdefault(i, i) != i:
+            identical[i] = identical[identical[i]]
+            i = identical[i]
+        return i
+
     for indices in groups.values():
         stats.possible_pairs += eligible_pairs(indices, forms, queries)
         if cross_repo:
@@ -88,6 +100,8 @@ def match_forms(
                 if score < threshold:
                     continue
                 stats.matching_pairs += 1
+                if common == len(tokens) == len(other):
+                    identical[root(i)] = root(j)
                 a, b = (i, j) if queries is not None and j not in queries else sorted((i, j))
                 best.append((-score, -min(left.entry.nodes, right.entry.nodes), a, b))
                 if len(best) > 2 * limit:
@@ -95,7 +109,21 @@ def match_forms(
             if queries is None:
                 for token in prefixes[i]:
                     postings[token].append(i)
-    return [
+    members: dict[int, list[int]] = defaultdict(list)
+    for i in sorted(identical):
+        members[root(i)].append(i)
+    stats.identical_groups = len(members)
+    identical_groups = [
+        Group(
+            language=forms[group[0]].entry.language,
+            nodes=forms[group[0]].entry.nodes,
+            members=[forms[i].location() for i in group],
+        )
+        for group in nsmallest(
+            limit, members.values(), key=lambda g: (-len(g), -forms[g[0]].entry.nodes, g[0])
+        )
+    ]
+    matches = [
         Match(
             score=-score,
             language=forms[a].entry.language,
@@ -103,4 +131,5 @@ def match_forms(
             right=forms[b].location(),
         )
         for score, _size, a, b in nsmallest(limit, best)
-    ], stats
+    ]
+    return matches, identical_groups, stats

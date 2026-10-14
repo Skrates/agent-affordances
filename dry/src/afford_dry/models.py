@@ -14,6 +14,7 @@ class Entry:
     end_line: int
     nodes: int
     fingerprints: frozenset[str]
+    declaration: bool = False
 
 
 class Location(BaseModel):
@@ -50,6 +51,14 @@ class Match(BaseModel):
     right: Location
 
 
+class Group(BaseModel):
+    """Forms with identical normalized structure: every pair among them scores 1.0."""
+
+    language: str
+    nodes: int
+    members: list[Location]
+
+
 class Diagnostic(BaseModel):
     repo: str
     file: str
@@ -63,6 +72,7 @@ class Stats(BaseModel):
     possible_pairs: int = 0
     comparisons: int = 0
     matching_pairs: int = 0
+    identical_groups: int = 0
 
 
 class Report(BaseModel):
@@ -72,9 +82,11 @@ class Report(BaseModel):
     complete: bool
     stats: Stats = Field(default_factory=Stats)
     matches: list[Match] = Field(default_factory=list)
+    groups: list[Group] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
     @computed_field
     @property
     def truncated(self) -> bool:
-        return self.stats.matching_pairs > len(self.matches)
+        stats = self.stats
+        return stats.matching_pairs > len(self.matches) or stats.identical_groups > len(self.groups)

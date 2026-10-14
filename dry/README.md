@@ -60,12 +60,22 @@ significant. Python source encoding declarations are honored.
   total `stats.matching_pairs` and `truncated` flag disclose omitted results.
   Pairs sort by descending score, then the smaller function's node count
   descending, then stable source order: substantial copies precede tiny helpers.
+- Similarity below 1.0 is not transitive: A~B and B~C do not make A~C, so do
+  not chain pairs into clusters. `groups` lists forms with identical normalized
+  structure, where every pair scores 1.0. They are ordered by member count, then
+  node count. `--limit` bounds them too; `stats.identical_groups` gives the total.
+  A group's pairs are counted and listed like any other pair, under the same
+  focus, `--cross-repo`, and `--limit` rules. A focused or cross-repo search only
+  merges members through pairs it reports, so not every member pair need appear.
 - `stats.comparisons` counts exact fingerprint intersections;
   `stats.possible_pairs` counts the eligible exhaustive search space.
 - Exit 0 means a complete scan, including one that found candidates. Exit 1
   means a partial scan, with `complete: false` and file diagnostics. Exit 2
   means invalid input. Invalid syntax excludes the entire file, rather than
-  letting a recovered parse look like complete evidence.
+  letting a recovered parse look like complete evidence. `complete` means every
+  eligible file was parsed, not that every copy was found: a small change high
+  in a short function, such as a type assertion, can move a near-copy below
+  the threshold.
 - Git supplies tracked and non-ignored untracked files. Deleted tracked files,
   dependency/build directories, declarations (`.d.ts`, `.d.mts`, `.d.cts`), and tests are omitted.
   `--include-tests` includes tests; repeat `--exclude GLOB` to omit additional
@@ -75,6 +85,10 @@ significant. Python source encoding declarations are honored.
   functions, TypeScript callbacks inside functions, and Rust closures remain in
   their enclosing function. TypeScript top-level assigned arrows are candidates;
   Rust `mod tests` functions are excluded.
+- Functions whose body executes nothing are omitted: only docstrings, comments,
+  `pass`, `...`, or `raise NotImplementedError`, or an empty block. With names
+  and types normalized away, such a form is just its parameter-list shape, and
+  it would match unrelated protocol methods. `match` on one is an input error.
 - Defaults are `--threshold 0.82 --min-lines 4 --min-nodes 20` for scans.
   `match` defaults to minimums of 1 to allow small reuse queries.
 - Analysis reads local files and Git state. It writes no repository metrics,

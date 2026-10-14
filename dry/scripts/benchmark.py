@@ -25,7 +25,7 @@ def main() -> None:
     _, forms, report = collect(args.roots, False, None, 4, 20, "scan", args.threshold)
     parsed = perf_counter() - start
     start = perf_counter()
-    _, full = match_forms(forms, args.threshold, 50)
+    _, _, full = match_forms(forms, args.threshold, 50)
     indexed_full = perf_counter() - start
     sample = random.Random(0).sample(forms, min(args.sample, len(forms)))
     start = perf_counter()
@@ -44,7 +44,7 @@ def main() -> None:
             ] = score
     exhaustive = perf_counter() - start
     start = perf_counter()
-    matches, stats = match_forms(sample, args.threshold, max(1, len(expected)))
+    matches, _, stats = match_forms(sample, args.threshold, max(1, len(expected)))
     indexed_sample = perf_counter() - start
     actual = {
         (

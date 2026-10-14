@@ -13,7 +13,7 @@ from tree_sitter import Language, Node, Parser, Tree
 
 from .models import Diagnostic, Entry, Form
 from .repository import Repository, language_of
-from .shape import fingerprints, normalize, text
+from .shape import SKIP, fingerprints, normalize, text
 
 TS_FUNCTIONS = {
     "function_declaration",
@@ -144,6 +144,45 @@ def functions(root: Node, language: str) -> list[Node]:
     return found
 
 
+def plain_string(node: Node) -> bool:
+    return node.type == "string" and not any(c.type == "interpolation" for c in node.children)
+
+
+def inert(statement: Node) -> bool:
+    if statement.type in SKIP or statement.type == "pass_statement":
+        return True
+    if statement.type == "expression_statement":
+        return all(
+            child.type == "ellipsis" or plain_string(child) for child in statement.named_children
+        )
+    if statement.type == "raise_statement" and statement.named_children:
+        raised = statement.named_children[0]
+        if raised.type == "call":
+            arguments = raised.child_by_field_name("arguments")
+            if arguments is not None and not all(
+                plain_string(argument) for argument in arguments.named_children
+            ):
+                return False
+            raised = raised.child_by_field_name("function") or raised
+        return text(raised) == "NotImplementedError"
+    return False
+
+
+def declaration_only(node: Node) -> bool:
+    """A body of docstrings, `pass`, `...`, or `raise NotImplementedError` executes nothing.
+
+    Normalization drops names, types, and literals, so such a form reduces to its
+    parameter-list shape and matches unrelated signatures at high scores.
+    """
+    function = node.child_by_field_name("value") if node.type in TS_PARENTS else node
+    body = function.child_by_field_name("body") if function is not None else None
+    return (
+        body is not None
+        and body.type in {"block", "statement_block"}
+        and all(inert(statement) for statement in body.named_children)
+    )
+
+
 def end_line(node: Node) -> int:
     return max(node.start_point.row + 1, node.end_point.row + bool(node.end_point.column))
 
@@ -160,7 +199,7 @@ def symbol(node: Node) -> str:
 
 
 def read_forms(
-    repo: Repository, path: Path, min_lines: int, min_nodes: int
+    repo: Repository, path: Path, min_lines: int, min_nodes: int, declarations: bool = False
 ) -> tuple[list[Form], Diagnostic | None]:
     relative = path.relative_to(repo.root).as_posix()
     language = language_of(path)
@@ -182,6 +221,9 @@ def read_forms(
             start, end = node.start_point.row + 1, end_line(node)
             if end - start + 1 < min_lines:
                 continue
+            declaration = declaration_only(node)
+            if declaration and not declarations:
+                continue
             if node.parent is not None and node.parent.type == "decorated_definition":
                 start = node.parent.start_point.row + 1
             shape = normalize(node)
@@ -194,7 +236,7 @@ def read_forms(
                         repo.name,
                         path,
                         symbol(node),
-                        Entry(language, relative, start, end, count, prints),
+                        Entry(language, relative, start, end, count, prints, declaration),
                     )
                 )
         return forms, None
