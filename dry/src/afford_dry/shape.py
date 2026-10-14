@@ -155,11 +155,10 @@ def call_parts(node: Node) -> tuple[list[Node], list[Node], Node | None]:
 def jobs(node: Node, mode: Mode, head: bool) -> list[Job]:
     if mode == "callee":
         if node.type in ATTRIBUTES:
-            return [(child, "norm", False) for child in node.named_children[:-1]] + (
-                [(node.named_children[-1], "callee", False)]
-                if node.named_children and node.named_children[-1].type not in IDENTIFIERS
-                else []
-            )
+            pending: list[Job] = [(child, "norm", False) for child in node.named_children[:-1]]
+            if node.named_children and node.named_children[-1].type not in IDENTIFIERS:
+                pending.append((node.named_children[-1], "callee", False))
+            return pending
         if node.type in SCOPED:
             return [
                 (child, "path" if child.type in SCOPED else "norm", False)
