@@ -16,8 +16,13 @@ broker's). An agent-affordances version alone says nothing about which Hive a se
 ## Install
 
 ```sh
-uv tool install --from ./attention hive-attention
+uv tool install --from ./attention hive-attention          # --force to upgrade in place
 ```
+
+On a seat host without GitHub credentials, ship the directory and install from it:
+`git archive <sha> attention | ssh <host> 'mkdir -p /tmp/ha && tar -x -C /tmp/ha'`, then as the seat
+user `uv tool install --force --from /tmp/ha/attention hive-attention`. The launcher needs the
+`hive` CLI of the same host on PATH (deploy-hive installs it as `~/.local/bin/hive`).
 
 `HIVE_BIN` overrides which Hive executable is used (a path, or a name on PATH); otherwise the
 `hive` on PATH.
@@ -58,8 +63,34 @@ hive-attention show 42 --json
 }
 ```
 
+A summoning turn **ends normally** after the summons — it never waits for the answer. The
+answer arrives later as an ordinary Hive wake (`Attention return ATN-<id> …`): context-restored
+for headless seats, or into the exact session when a live surface can honour it.
+
+Recovery, when a request's outcome is unknown (exit 6):
+
+- `summon`: `hive-attention receipt <command_id>`; if absent, rerun the **same** envelope file.
+- `bind`: rerun it with `--command-id <id>` from the same turn (same dispatch token) or the same
+  live session; once neither is in reach, the operator recovers it with
+  `hive attention bind --operator --command-id <id> …` on that edge.
+
 When to summon, how to choose keys, and how to handle the response: the `hive-attention`
 skill in weave-doctrine.
+
+## Use (human side)
+
+The human pulls from an operator shell — `HIVE_BROKER_URL` and `HIVE_ADMIN_TOKEN` set; the CLI
+refuses the operator credential inside an agent's environment:
+
+```sh
+hive attention next                      # claims the next item (FIFO) and prints its brief
+hive attention resolve <id> --expected-revision <n> --outcome selected --response "B." --next
+hive attention queue                     # active, eligible, deferred, returns in flight
+```
+
+With the broker's Slack front end on (Hive ADR-0004 Amendment 1), each summons also arrives as one
+DM card from the Hive app — **Take next** is the main button, **Answer this one** a rare override —
+and the app's Home tab shows the queue.
 
 ## Develop
 
