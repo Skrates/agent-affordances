@@ -1,0 +1,38 @@
+[project]
+name = "gemini-dispatch"
+version = "0.1.0"
+description = "Hand one self-contained task to Gemini through the Antigravity CLI (agy) and judge the result"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.10",
+    "typer>=0.16",
+]
+
+[project.scripts]
+gemini-dispatch = "gemini_dispatch.cli:app"
+
+[dependency-groups]
+# ruff/ty are deliberately not dev deps: CI takes their versions from
+# toolchain/mise.toml (bare binaries on PATH via mise shims).
+dev = [
+    "pytest>=8.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gemini_dispatch"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
