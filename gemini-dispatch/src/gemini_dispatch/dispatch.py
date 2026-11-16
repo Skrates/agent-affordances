@@ -32,7 +32,8 @@ STATE_DIR = ".gemini-dispatch"
 #: Extra seconds the process may run past agy's own `--print-timeout` before it is killed.
 GRACE_SECONDS = 60
 
-_FENCE = re.compile(r"\A\s*```[\w+-]*[ \t]*\n(?P<body>.*?)\n[ \t]*```\s*\Z", re.DOTALL)
+#: An opening code-fence line: three or more backticks, then an optional info string.
+_FENCE_OPEN = re.compile(r"^ {0,3}(?P<ticks>`{3,})[^`]*$")
 _UNSAFE_LABEL = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -41,11 +42,21 @@ class DispatchError(Exception):
 
 
 def strip_fence(text: str) -> str:
-    """Remove one Markdown code fence when it wraps the whole reply, and only then."""
-    match = _FENCE.match(text)
-    if match is None or "```" in match.group("body"):
+    """Remove one Markdown code fence when it wraps the whole reply, and only then.
+
+    Read line by line, not by pattern over the whole text: the first line opens the fence, the
+    last line closes it with at least as many backticks, and whatever lies between is the body,
+    including nothing at all. A reply with any other fence inside it is left as it is.
+    """
+    lines = text.strip().splitlines()
+    if len(lines) < 2:
         return text
-    return match.group("body")
+    opening = _FENCE_OPEN.match(lines[0])
+    closing = lines[-1].strip()
+    if opening is None or set(closing) != {"`"} or len(closing) < len(opening.group("ticks")):
+        return text
+    body = "\n".join(lines[1:-1])
+    return text if "```" in body else body
 
 
 def stage_images(cwd: Path, images: list[Path], inputs: Path) -> list[str]:

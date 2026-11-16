@@ -99,11 +99,12 @@ def test_an_expected_file_rewritten_by_the_dispatch_counts(
 def test_a_reply_that_is_only_an_empty_fence_is_an_empty_reply(
     agy: FakeAgy, job: Path, success: Success
 ) -> None:
-    agy.plan(success("```text\n\n```"))
-    dispatch = run(Request(cwd=job, prompt="write it", strip_fence=True))
+    for empty_fence in ("```text\n\n```", "```text\n```", "```\n```", "```\n  \n```\n"):
+        agy.plan(success(empty_fence))
+        dispatch = run(Request(cwd=job, prompt="write it", strip_fence=True))
 
-    assert dispatch.outcome is Outcome.empty_reply
-    assert "once its code fence was removed" in dispatch.detail
+        assert dispatch.outcome is Outcome.empty_reply, repr(empty_fence)
+        assert "once its code fence was removed" in dispatch.detail
 
 
 def test_a_non_success_status_fails(agy: FakeAgy, job: Path) -> None:
@@ -262,10 +263,24 @@ def test_a_missing_agy_is_a_diagnostic_not_a_traceback(
 @pytest.mark.parametrize(
     ("reply", "expected"),
     [
+        # a fence around the whole reply: the body comes back, whatever its size
         ("```\nthe prompt\n```", "the prompt"),
         ("```text\nline one\nline two\n```\n", "line one\nline two"),
+        ("\n\n  ```python\ncode\n```  \n", "code"),
+        ("```\r\nwindows\r\n```\r\n", "windows"),
+        ("````\nfour ticks\n````", "four ticks"),
+        ("```\n\nblank lines kept\n\n```", "\nblank lines kept\n"),
+        # an empty fence, with and without a line between its markers
+        ("```\n```", ""),
+        ("```text\n```", ""),
+        ("```text\n\n```", ""),
+        ("```\n   \n```\n", "   "),
+        # not one fence around everything: left exactly as it was
         ("Here it is:\n```\ncode\n```", "Here it is:\n```\ncode\n```"),
         ("```\na\n```\nand\n```\nb\n```", "```\na\n```\nand\n```\nb\n```"),
+        ("```\ncode\n``` and more", "```\ncode\n``` and more"),
+        ("````\ncode\n```", "````\ncode\n```"),
+        ("```", "```"),
         ("no fence at all", "no fence at all"),
     ],
 )
