@@ -15,7 +15,7 @@ from typing import Annotated
 
 import typer
 
-from .dispatch import DispatchError, run, strip_fence
+from .dispatch import DispatchError, run
 from .models import EXIT_CODES, Dispatch, Effort, Mode, Outcome, Request
 
 # Plain help: this tool's reader is an agent, and Rich's boxes cost tokens for nothing.
@@ -150,6 +150,7 @@ def main(
         label=label,
         expect=expect or [],
         allow_empty=allow_empty,
+        strip_fence=strip,
         skip_permissions=skip_permissions,
     )
     try:
@@ -158,7 +159,7 @@ def main(
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(EXIT_CODES[Outcome.agy_failed]) from error
 
-    reply = strip_fence(dispatch.reply) if strip else dispatch.reply
+    reply = dispatch.reply
     if dispatch.outcome is Outcome.ok and out is not None:
         out.write_text(reply if reply.endswith("\n") else reply + "\n", encoding="utf-8")
     elif reply:

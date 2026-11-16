@@ -103,6 +103,7 @@ class Request(BaseModel):
     label: str = "task"
     expect: list[str] = Field(default_factory=list)
     allow_empty: bool = False
+    strip_fence: bool = False
     skip_permissions: bool = False
 
 

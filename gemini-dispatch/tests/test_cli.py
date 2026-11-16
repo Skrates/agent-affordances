@@ -53,6 +53,20 @@ def test_out_file_is_left_alone_when_the_dispatch_fails(
     assert "DENIED (not run): Bash (command)" in result.stderr
 
 
+def test_an_empty_fence_does_not_replace_the_last_good_out_file(
+    agy: FakeAgy, job: Path, success: Success
+) -> None:
+    out = job / "prompt.txt"
+    out.write_text("the last good prompt\n")
+    agy.plan(success("```text\n\n```"))
+    result = runner.invoke(
+        app, ["--cwd", str(job), "--prompt", "q", "--out", str(out), "--strip-fence"]
+    )
+
+    assert result.exit_code == 4
+    assert out.read_text() == "the last good prompt\n"
+
+
 def test_exit_statuses_tell_the_failures_apart(agy: FakeAgy, job: Path, success: Success) -> None:
     base = ["--cwd", str(job), "--prompt", "q"]
 

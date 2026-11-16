@@ -13,8 +13,8 @@ turns that into an exit status that means something:
 | 1 | `agy` is missing or could not start, printed no result object, or reported a status other than `SUCCESS` |
 | 2 | Usage error (bad path, no prompt) |
 | 3 | Time ran out: agy stopped at `--timeout` mid-turn, or printed nothing for 60 s more and was killed with its helpers |
-| 4 | Gemini returned no text (typical after a denied tool call) |
-| 5 | A file named with `--expect` is absent, empty, or older than the dispatch |
+| 4 | Gemini returned no text (typical after a denied tool call), or nothing but an empty code fence under `--strip-fence` |
+| 5 | A file named with `--expect` is absent, empty, or exactly as it was before the dispatch |
 
 ## Install
 
@@ -41,7 +41,9 @@ echo "Summarise notes.md in five lines." | gemini-dispatch --cwd JOB
 - **stderr** carries one status line (`outcome`, agy `status`, seconds, tokens, log path), the
   reason for a failure, each denied action, and up to 20 lines of agy's own warnings.
 - **`JOB/.gemini-dispatch/<time>-<label>.json`** keeps the whole exchange: prompt, result object,
-  or raw output when there was none. Timeouts and unparseable output are logged too.
+  or raw output when there was none. Timeouts and unparseable output are logged too. The file is
+  created before agy starts (outcome `running`), so concurrent dispatches in one folder never share
+  a log and an interrupted one still leaves its prompt behind.
 
 | Option | Effect |
 | --- | --- |
@@ -61,7 +63,7 @@ echo "Summarise notes.md in five lines." | gemini-dispatch --cwd JOB
 ## What Gemini can see
 
 Only `--cwd` and any `--add-dir`. An image outside `--cwd` is copied to
-`.gemini-dispatch/inputs/NN-<name>` and named by that relative path, so neither the image's
+`.gemini-dispatch/inputs/<dispatch>/NN-<name>` and named by that relative path, so neither the image's
 folder nor your home path enters the prompt. In `accept-edits` mode Gemini may edit files in
 every directory it can see: pass `--add-dir` only for folders it may change, and inline
 reference text into the prompt instead when the source must stay untouched.

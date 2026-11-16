@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -72,6 +74,36 @@ def test_a_file_left_from_an_earlier_run_does_not_count(
     agy.plan(success("Saved out.png."))
 
     assert run(Request(cwd=job, prompt="draw", expect=["out.png"])).outcome is Outcome.missing_file
+
+
+def test_a_file_written_just_before_the_dispatch_does_not_count(
+    agy: FakeAgy, job: Path, success: Success
+) -> None:
+    (job / "out.png").write_text("pixels from the run a moment ago")
+    agy.plan(success("Saved out.png."))
+    dispatch = run(Request(cwd=job, prompt="draw", expect=["out.png"]))
+
+    assert dispatch.outcome is Outcome.missing_file
+    assert "unchanged by this dispatch" in dispatch.detail
+
+
+def test_an_expected_file_rewritten_by_the_dispatch_counts(
+    agy: FakeAgy, job: Path, success: Success
+) -> None:
+    (job / "out.png").write_text("old")
+    agy.plan(success("Saved out.png."), write={"out.png": "new pixels"})
+
+    assert run(Request(cwd=job, prompt="draw", expect=["out.png"])).outcome is Outcome.ok
+
+
+def test_a_reply_that_is_only_an_empty_fence_is_an_empty_reply(
+    agy: FakeAgy, job: Path, success: Success
+) -> None:
+    agy.plan(success("```text\n\n```"))
+    dispatch = run(Request(cwd=job, prompt="write it", strip_fence=True))
+
+    assert dispatch.outcome is Outcome.empty_reply
+    assert "once its code fence was removed" in dispatch.detail
 
 
 def test_a_non_success_status_fails(agy: FakeAgy, job: Path) -> None:
@@ -159,11 +191,49 @@ def test_an_outside_image_is_staged_so_its_folder_is_never_opened(
     run(Request(cwd=job, prompt="compare", images=[private / "key.png", job / "plate.png"]))
 
     prompt = agy.argv[1]
-    assert "- Image 1: .gemini-dispatch/inputs/01-key.png" in prompt
+    staged = re.search(r"- Image 1: (\.gemini-dispatch/inputs/[^/\n]+/01-key\.png)", prompt)
+    assert staged is not None
     assert "- Image 2: plate.png" in prompt
-    assert (job / ".gemini-dispatch/inputs/01-key.png").read_bytes() == b"png"
+    assert (job / staged.group(1)).read_bytes() == b"png"
     assert str(tmp_path) not in " ".join(agy.argv)
     assert agy.flag("--add-dir") == []
+
+
+def test_same_named_images_of_two_dispatches_do_not_replace_each_other(
+    agy: FakeAgy, job: Path, tmp_path: Path, success: Success
+) -> None:
+    staged: list[Path] = []
+    for content in (b"first", b"second"):
+        source = tmp_path / content.decode() / "key.png"
+        source.parent.mkdir()
+        source.write_bytes(content)
+        agy.plan(success())
+        run(Request(cwd=job, prompt="look", images=[source]))
+        ref = re.search(r"- Image 1: (\S+)", agy.argv[1])
+        assert ref is not None
+        staged.append(job / ref.group(1))
+
+    assert staged[0] != staged[1]
+    assert [path.read_bytes() for path in staged] == [b"first", b"second"]
+
+
+def test_two_dispatches_in_one_second_keep_separate_logs(
+    agy: FakeAgy, job: Path, success: Success
+) -> None:
+    agy.plan(success(), sleep=1)
+    logs: list[Path] = []
+
+    def dispatch(prompt: str) -> None:
+        logs.append(run(Request(cwd=job, prompt=prompt, label="same")).log)
+
+    threads = [threading.Thread(target=dispatch, args=(text,)) for text in ("one", "two")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert logs[0] != logs[1]
+    assert {json.loads(log.read_text())["prompt"] for log in logs} == {"one", "two"}
 
 
 def test_only_requested_directories_and_flags_reach_agy(
