@@ -9,6 +9,7 @@ directory as an independent uv project.
 | [`spark`](spark/) | `afford spark` semantic coreutils over Codex-Spark; optional `afford-sparkd` warm daemon |
 | [`attention`](attention/) | `hive-attention`: forwards verbatim to `hive attention` — seats summon the human through Hive's attention queue |
 | [`dry`](dry/) | `afford-dry`: find reusable code and structural duplicates across Python, TypeScript, Go, and Rust repositories |
+| [`gemini-dispatch`](gemini-dispatch/) | `gemini-dispatch`: hand one self-contained task to Gemini through the Antigravity CLI and get an exit status that means the work was done |
 
 ## House standards
 

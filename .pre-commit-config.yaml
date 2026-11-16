@@ -63,6 +63,12 @@ repos:
         files: '^dry/'
         pass_filenames: false
         stages: [pre-push]
+      - id: uv-lock-gemini-dispatch
+        name: uv lock check (gemini-dispatch)
+        entry: uv lock --check --project gemini-dispatch
+        language: system
+        pass_filenames: false
+        files: '^gemini-dispatch/(pyproject\.toml|uv\.(lock|toml))$'
       - id: ty
         name: ty type check
         entry: ty check
